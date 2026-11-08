@@ -112,6 +112,8 @@ jobs:
 
       - name: Package Elastic Beanstalk Bundle (including Procfile)
         run: |
+          echo "Sanitizing Procfile with strict Unix LF line endings..."
+          printf "web: npm start\n" > Procfile
           echo "Packaging application bundle with Procfile..."
           rm -f beanstalk-deploy.zip
           zip -r beanstalk-deploy.zip . \
