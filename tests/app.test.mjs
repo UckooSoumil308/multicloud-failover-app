@@ -4,6 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Configure test environment defaults before any application modules are loaded
+process.env.NODE_ENV = 'test';
+process.env.PORT = process.env.PORT || '8080';
+process.env.CLOUD_PROVIDER = process.env.CLOUD_PROVIDER || 'LOCAL-DEV';
+process.env.CLOUD_REGION = process.env.CLOUD_REGION || 'local';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
@@ -154,4 +160,3 @@ test('CRUD Records API Route (/api/records)', async (t) => {
     assert.equal(json.record.title, 'End-to-End API Test Event');
   });
 });
-
