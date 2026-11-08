@@ -209,9 +209,9 @@ export default function MultiCloudDashboard() {
           <div
             className={`p-5 rounded-2xl border transition-all duration-300 relative overflow-hidden ${
               isAzure
-                ? 'bg-blue-950/40 border-blue-500/40 glow-azure'
+                ? 'bg-blue-950/40 border-blue-500/40 glow-azure badge-azure'
                 : isAws
-                ? 'bg-amber-950/40 border-amber-500/40 glow-aws'
+                ? 'bg-amber-950/40 border-amber-500/40 glow-aws badge-aws'
                 : 'bg-slate-900/60 border-slate-800'
             }`}
           >
@@ -258,14 +258,14 @@ export default function MultiCloudDashboard() {
           <div
             className={`p-5 rounded-2xl border transition-all duration-300 ${
               isOutage
-                ? 'bg-rose-950/50 border-rose-500/60 glow-danger'
-                : 'bg-emerald-950/30 border-emerald-500/40'
+                ? 'bg-rose-950/50 border-rose-500/60 glow-danger badge-outage'
+                : 'bg-emerald-950/30 border-emerald-500/40 badge-healthy'
             }`}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs uppercase font-mono tracking-wider text-slate-400">Endpoint Health State</span>
               <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                isOutage ? 'bg-rose-500 text-white animate-pulse' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                isOutage ? 'badge-outage animate-pulse' : 'badge-healthy'
               }`}>
                 {healthStatus} {isOutage ? 'OUTAGE' : 'OK'}
               </span>
@@ -515,9 +515,9 @@ export default function MultiCloudDashboard() {
                           <span
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold font-mono border ${
                               isAzureRecord
-                                ? 'bg-blue-950/60 text-blue-300 border-blue-500/40'
+                                ? 'badge-azure'
                                 : isAwsRecord
-                                ? 'bg-amber-950/60 text-amber-300 border-amber-500/40'
+                                ? 'badge-aws'
                                 : 'bg-slate-800 text-slate-300 border-slate-700'
                             }`}
                           >
