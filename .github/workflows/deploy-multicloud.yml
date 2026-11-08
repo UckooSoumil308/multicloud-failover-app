@@ -113,12 +113,22 @@ jobs:
       - name: Package Elastic Beanstalk Bundle (including Procfile)
         run: |
           echo "Packaging application bundle with Procfile..."
+          rm -f beanstalk-deploy.zip
           zip -r beanstalk-deploy.zip . \
             -x "*.git*" \
+            -x ".github/*" \
             -x "tests/*" \
             -x "Dockerfile" \
             -x ".dockerignore" \
-            -x ".github/*"
+            -x "node_modules/*" \
+            -x ".next/cache/*" \
+            -x ".env*" \
+            -x "*.zip"
+
+      - name: Verify Elastic Beanstalk Archive Structure
+        run: |
+          echo "Verifying root files in beanstalk-deploy.zip:"
+          unzip -l beanstalk-deploy.zip | grep -E "(package\.json|Procfile|\.ebextensions|\.platform)"
 
       - name: Deploy to AWS Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v22
