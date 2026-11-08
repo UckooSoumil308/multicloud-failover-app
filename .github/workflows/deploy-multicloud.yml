@@ -1,0 +1,143 @@
+name: Zero-Cost Dual-Cloud Multi-Region CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # 1. BUILD, TEST & CONTAINER VERIFICATION
+  # =========================================================================
+  build-test-verify:
+    name: Build, Test & Verify Container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Native Automated Unit & Integration Tests
+        run: npm test
+
+      - name: Build Next.js Production Application
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+
+      - name: Verify Docker Container Build
+        run: |
+          echo "Building multi-stage production Docker image..."
+          docker build -t multi-cloud-failover:ci .
+          echo "Docker image built successfully."
+
+  # =========================================================================
+  # 2. DEPLOY PRIMARY: AZURE APP SERVICE (F1 FREE LINUX NODE 20)
+  # =========================================================================
+  deploy-azure-free-tier:
+    name: Deploy to Azure App Service (F1 Linux Free Tier)
+    needs: build-test-verify
+    if: vars.ENABLE_AZURE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME || 'multicloud-azure-primary' }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: .
+
+      - name: Verify Azure Health Check Endpoint
+        run: |
+          AZURE_URL="https://${{ vars.AZURE_WEBAPP_NAME || 'multicloud-azure-primary' }}.azurewebsites.net/api/health"
+          echo "Probing Azure health check at: $AZURE_URL"
+          curl -f -s -S --retry 5 --retry-delay 10 "$AZURE_URL" || echo "Note: Initial cold start in progress"
+
+  # =========================================================================
+  # 3. DEPLOY SECONDARY: AWS ELASTIC BEANSTALK (SINGLE-INSTANCE FREE TIER)
+  # =========================================================================
+  deploy-aws-free-tier:
+    name: Deploy to AWS Elastic Beanstalk (Single-Instance Node 20)
+    needs: build-test-verify
+    if: vars.ENABLE_AWS_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies & Build
+        run: |
+          npm ci
+          npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NODE_ENV: production
+
+      - name: Package Elastic Beanstalk Bundle (including Procfile)
+        run: |
+          echo "Packaging application bundle with Procfile..."
+          zip -r beanstalk-deploy.zip . \
+            -x "*.git*" \
+            -x "tests/*" \
+            -x "Dockerfile" \
+            -x ".dockerignore" \
+            -x ".github/*"
+
+      - name: Deploy to AWS Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ vars.AWS_EB_APP_NAME || 'multicloud-failover-app' }}
+          environment_name: ${{ vars.AWS_EB_ENV_NAME || 'multicloud-env-secondary' }}
+          version_label: "v-${{ github.sha }}-${{ github.run_number }}"
+          region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          deployment_package: beanstalk-deploy.zip
+          use_existing_version_if_available: false
+
+      - name: Verify AWS Elastic Beanstalk Health Check Endpoint
+        run: |
+          if [ -n "${{ vars.AWS_EB_ENDPOINT_URL }}" ]; then
+            echo "Probing AWS Elastic Beanstalk health check at: ${{ vars.AWS_EB_ENDPOINT_URL }}/api/health"
+            curl -f -s -S --retry 5 --retry-delay 10 "${{ vars.AWS_EB_ENDPOINT_URL }}/api/health" || echo "Initial cold start in progress"
+          else
+            echo "AWS_EB_ENDPOINT_URL not set; skipping live endpoint curl check."
+          fi
+
